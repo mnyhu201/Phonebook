@@ -1,5 +1,5 @@
-import removePerson from './services.js'
-import personService from './services.js'
+import removePerson from '../Service/services.js'
+import personService from '../Service/services.js'
 
 const Persons = (props) => {
     const {persons, filter, setPersons, onDelete} = props;

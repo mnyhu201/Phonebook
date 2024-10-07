@@ -1,11 +1,11 @@
 import './App.css';
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import personService from './services.js'
-import Persons from './Persons'
-import Filter from './Filter'
-import PersonForm from './PersonForm'
-import Message from './Message.js'
+import personService from './Service/services.js'
+import Persons from './Components/Persons.js'
+import Filter from './Components/Filter.js'
+import PersonForm from './Components/PersonForm.js'
+import Message from './Components/Message.js'
 
 
 const App = () => {

@@ -5,6 +5,44 @@ const cors = require('cors') // use cors to prevent single origin conflict
 app.use(cors())
 app.use(express.json())
 app.use(morgan('tiny')) // using morgan
+const mongoose = require('mongoose')
+require('dotenv').config()
+
+
+// // invalid number of arguments
+// if(process.argv.length > 5){ 
+//   console.log('too many arguments')
+//   process.exit(1)
+// } else if(process.argv.length > 3 && process.argv.length != 5){
+//   console.log('invalid number of arguments')
+//   process.exit(1)
+// }
+// if (process.argv.length < 3) {
+//   console.log('give password as argument')
+//   process.exit(1)
+// }
+
+// const password = process.argv[2]
+const url = process.env.MONGODB_URI;
+console.log(url)
+
+mongoose.set('strictQuery',false)
+mongoose.connect(url)
+  .then(result => {
+    console.log('connected to MongoDB')
+  })
+  .catch(error => {
+    console.log('error connecting to MongoDB:', error.message)
+  })
+
+
+
+const contactSchema = new mongoose.Schema({
+  name: String,
+  number: String,
+})
+
+const Contact = mongoose.model('Contact', contactSchema)
 
 
 let contacts = [
@@ -37,58 +75,85 @@ app.get('/', (request, response) => {
 })
 
 app.get('/api/persons', (request, response) => {
-  response.json(contacts)
-})
+  Contact.find({})
+    .then(contacts => {
+      response.json(contacts);
+    })
+    .catch(error => {
+      console.error('Error fetching contacts:', error);
+      response.status(500).send({ error: 'Failed to fetch contacts' });
+    });
+});
 
 
 app.get('/info', (request, response) => {
-    response.send(`<p> Phonebook has info for ${contacts.length} people </p> 
-        ${Date()}`)
-})
+  Contact.countDocuments({})
+    .then(count => {
+      response.send(`<p>Phonebook has info for ${count} people</p><p>${new Date()}</p>`);
+    })
+    .catch(error => {
+      console.error('Error fetching contact count:', error);
+      response.status(500).send({ error: 'Failed to fetch contact count' });
+    });
+});
 
 // find one person 
-app.get('/api/persons/:id', (request, response) =>{
-    const id = request.params.id
-    const contact = contacts.find((n) => n.id === id)
-    if (contact) {
-        response.json(contact)
-    } else {
-        response.status(404).end()
-    }
-})
+app.get('/api/persons/:id', (request, response) => {
+  Contact.findById(request.params.id)
+    .then(contact => {
+      if (contact) {
+        response.json(contact);
+      } else {
+        response.status(404).send({ error: 'Contact not found' });
+      }
+    })
+    .catch(error => {
+      console.error('Error fetching contact:', error);
+      response.status(400).send({ error: 'Malformatted ID' });
+    });
+});
 
 // delete a contact
 app.delete('/api/persons/:id', (request, response) => {
-    const id = request.params.id;
-    const contact = contacts.find(cont => cont.id === id); // Find the contact
-
-    if (!contact) {
-        return response.status(404).send({ "error": "contact does not exist" });
-    }
-
-    contacts = contacts.filter(cont => cont.id !== id); // Filter out the contact
-    response.status(204).end();  // 204 No Content, meaning successful deletion
-      
-})
+  Contact.findByIdAndRemove(request.params.id)
+    .then(result => {
+      if (result) {
+        response.status(204).end();
+      } else {
+        response.status(404).send({ error: 'Contact not found' });
+      }
+    })
+    .catch(error => {
+      console.error('Error deleting contact:', error);
+      response.status(400).send({ error: 'Malformatted ID' });
+    });
+});
 
 // adding new contact to backend
 app.post('/api/persons', (request, response) => {
-    const newContact = request.body
-    const max = 99999999
-   
-    if(!newContact.name || !newContact.number){
-      response.status(400).send({ error: "missing name or number to add" });
-    } else if(contacts.find(cont => cont.name === newContact.name)){
-        response.send({"error": "name must be unique"})
-    } else {
-        const id = Math.floor(Math.random() * max)
-        newContactCopy = {...newContact, id: id}
-        contacts = contacts.concat(newContactCopy)
-        response.status(201).json(newContactCopy)
-    }
-})
+  const { name, number } = request.body;
 
-const PORT = 3001
+  if (!name || !number) {
+    return response.status(400).json({ error: 'Name and number are required' });
+  }
+
+  Contact.findOne({ name })
+    .then(existingContact => {
+      if (existingContact) { // existing product not null
+        return response.status(400).json({ error: 'Name must be unique' });
+      }
+      // now adding new contact, make new object with schema
+      const contact = new Contact({ name, number });
+      contact.save()
+        .then(savedContact => response.status(201).json(savedContact))
+        .catch(error => {
+          console.error('Error saving contact:', error);
+          response.status(500).json({ error: 'Failed to save contact' });
+        });
+    });
+});
+
+const PORT = process.env.PORT
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
 })
