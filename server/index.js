@@ -1,40 +1,25 @@
-const express = require('express')
-const app = express()
-const morgan = require('morgan');  // Import morgan
-const cors = require('cors') // use cors to prevent single origin conflict
-app.use(cors())
-app.use(express.json())
-app.use(morgan('tiny')) // using morgan
-const mongoose = require('mongoose')
-require('dotenv').config()
+const express = require('express');
+const mongoose = require('mongoose');
+const morgan = require('morgan');
+const cors = require('cors');
+require('dotenv').config(); // To load environment variables from .env
 
+// Import the Contact model
+const Contact = require('./models/Contact');
+
+const app = express();
+app.use(cors());
+app.use(express.json()); // To parse JSON bodies
+app.use(morgan('tiny')); // For logging HTTP requests
+
+// MongoDB Connection
 const url = process.env.MONGODB_URI;
-console.log(url)
+mongoose.set('strictQuery', false);
+mongoose.connect(url);
 
-mongoose.set('strictQuery',false)
-mongoose.connect(url)
-  .then(result => {
-    console.log('connected to MongoDB')
-  })
-  .catch(error => {
-    console.log('error connecting to MongoDB:', error.message)
-  })
+// Routes
 
-
-
-const contactSchema = new mongoose.Schema({
-  name: String,
-  number: String,
-})
-
-const Contact = mongoose.model('Contact', contactSchema)
-
-
-app.get('/', (request, response) => {
-  response.send('Phonebook info: <br/>', '/info: displays general info', 
-    '/api/persons: all the contacts (/{id}: gets specific contact based on id) ' )
-})
-
+// GET /api/persons - Get all contacts
 app.get('/api/persons', (request, response) => {
   Contact.find({})
     .then(contacts => {
@@ -46,19 +31,7 @@ app.get('/api/persons', (request, response) => {
     });
 });
 
-
-app.get('/info', (request, response) => {
-  Contact.countDocuments({})
-    .then(count => {
-      response.send(`<p>Phonebook has info for ${count} people</p><p>${new Date()}</p>`);
-    })
-    .catch(error => {
-      console.error('Error fetching contact count:', error);
-      response.status(500).send({ error: 'Failed to fetch contact count' });
-    });
-});
-
-// find one person 
+// GET /api/persons/:id - Get a single contact by ID
 app.get('/api/persons/:id', (request, response) => {
   Contact.findById(request.params.id)
     .then(contact => {
@@ -74,23 +47,14 @@ app.get('/api/persons/:id', (request, response) => {
     });
 });
 
-// delete a contact
-app.delete('/api/persons/:id', (request, response) => {
-  Contact.findByIdAndRemove(request.params.id)
-    .then(result => {
-      if (result) {
-        response.status(204).end();
-      } else {
-        response.status(404).send({ error: 'Contact not found' });
-      }
-    })
-    .catch(error => {
-      console.error('Error deleting contact:', error);
-      response.status(400).send({ error: 'Malformatted ID' });
-    });
+// DELETE /api/persons/:id - Delete a contact by ID
+app.delete('/api/persons/:id', (req, res) => {
+  Contact.findByIdAndDelete(req.params.id)
+    .then(result => result ? res.status(204).end() : res.status(404).send({ error: 'Contact not found' }))
+    .catch(error => res.status(400).send({ error: 'Malformatted ID' }));
 });
 
-// adding new contact to backend
+// POST /api/persons - Add a new contact
 app.post('/api/persons', (request, response) => {
   const { name, number } = request.body;
 
@@ -100,10 +64,10 @@ app.post('/api/persons', (request, response) => {
 
   Contact.findOne({ name })
     .then(existingContact => {
-      if (existingContact) { // existing product not null
+      if (existingContact) {
         return response.status(400).json({ error: 'Name must be unique' });
       }
-      // now adding new contact, make new object with schema
+
       const contact = new Contact({ name, number });
       contact.save()
         .then(savedContact => response.status(201).json(savedContact))
@@ -114,7 +78,20 @@ app.post('/api/persons', (request, response) => {
     });
 });
 
-const PORT = process.env.PORT
+// GET /info - Display number of contacts and current time
+app.get('/info', (request, response) => {
+  Contact.countDocuments({})
+    .then(count => {
+      response.send(`<p>Phonebook has info for ${count} people</p><p>${new Date()}</p>`);
+    })
+    .catch(error => {
+      console.error('Error fetching contact count:', error);
+      response.status(500).send({ error: 'Failed to fetch contact count' });
+    });
+});
+
+// Server listen
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-})
+  console.log(`Server running on port ${PORT}`);
+});

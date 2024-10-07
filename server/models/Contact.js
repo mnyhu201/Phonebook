@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// Define the Contact schema, more info about required/unique
+// Define the Contact schema
 const contactSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -15,7 +15,6 @@ const contactSchema = new mongoose.Schema({
 
 // Set schema options (if any)
 contactSchema.set('toJSON', {
-    // removing unnecessary fields from the json
   transform: (document, returnedObject) => {
     returnedObject.id = returnedObject._id.toString();
     delete returnedObject._id; // Remove _id field from JSON
